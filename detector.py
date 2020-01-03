@@ -7,7 +7,7 @@ import torch.optim as optim
 from torch.utils.data.sampler import SubsetRandomSampler
 from torchvision import datasets, transforms
 from matplotlib import pyplot as plt
-
+import sys
 import runpy
 import numpy as np
 import os
@@ -163,7 +163,6 @@ def train(args, train_loader, valid_loader, model, criterion, optimizer, device)
         model.eval()  # prep model for evaluation
         with torch.no_grad():
             valid_batch_cnt = 0
-
             for valid_batch_idx, batch in enumerate(valid_loader):
                 valid_batch_cnt += 1
                 valid_img = batch['image']
@@ -184,6 +183,7 @@ def train(args, train_loader, valid_loader, model, criterion, optimizer, device)
                     valid_mean_pts_loss
                 )
             )
+
         print('====================================================')
         # save model
         if args.save_model and (epoch_id + 1) % 1000 == 0:
@@ -390,19 +390,20 @@ def main_test():
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
     print('===> Loading Datasets')
-    train_set, test_set = get_train_test_set()
+    train_set, test_set, predict_set = get_train_test_set()
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
     valid_loader = torch.utils.data.DataLoader(test_set, batch_size=args.test_batch_size)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=args.test_batch_size)
-    predict_loader = torch.utils.data.DataLoader(train_set, batch_size=args.predict_batch_size)   # predict_batch_size:1
+    predict_loader = torch.utils.data.DataLoader(predict_set, batch_size=args.predict_batch_size)   # predict_batch_size:1
 
     print('===> Building Model')
     # For single GPU
     model = Net().to(device)
     ####################################################################
-    criterion_pts = nn.MSELoss()
+    # criterion_pts = nn.MSELoss()
+    criterion_pts = nn.SmoothL1Loss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, nesterov=True)
-    optimizer_adam = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
+    # optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
     ####################################################################
     if args.phase == 'Train' or args.phase == 'train':
         print('===> Start Training')

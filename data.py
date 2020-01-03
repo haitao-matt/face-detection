@@ -205,7 +205,7 @@ class FaceLandmarksDataset(Dataset):
         else:
             sample['landmarks'] = landmarks_norm(sample['landmarks'])  #坐标归一化
         # if the original img is not color, then del img_color key
-        if self.phase == 'Train' or self.phase == 'train':
+        if self.phase != 'predict':
             del sample['img_color']
         return sample
 
@@ -213,7 +213,8 @@ class FaceLandmarksDataset(Dataset):
 def get_train_test_set():
     train_set = load_data('train')
     valid_set = load_data('test')
-    return train_set, valid_set
+    predict_set = load_data('predict')
+    return train_set, valid_set, predict_set
 
 
 def draw_picture(save_directory, img_name, landmarks, img_color):
@@ -248,14 +249,14 @@ def draw_picture(save_directory, img_name, landmarks, img_color):
     plt.axis('off')
     ax.scatter(scatter_x, scatter_y, s=2, c='r', marker='.')
     plt.savefig("%s" % path)
-    plt.show()
+    # plt.show()
     ax.cla()
 
 
 if __name__ == '__main__':
-    test_set = load_data('test')
-    for i in range(1, len(test_set)):
-        sample = test_set[i]
+    predict_set = load_data('predict')
+    for i in range(1, len(predict_set)):
+        sample = predict_set[i]
         original_image, original_shape, mean, std, img_color = sample['original_image'], sample['original_shape'],\
                                                          sample['mean'], sample['std'], sample['img_color']
         img_crop_width, img_crop_height = original_shape
