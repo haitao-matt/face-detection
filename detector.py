@@ -192,7 +192,7 @@ def train(args, train_loader, valid_loader, model, criterion, optimizer, device)
     return train_losses, valid_losses
 
 
-def test(args, test_loader, model, criterion, optimizer, device):
+def test(test_loader, model, criterion, device):
     ######################
     # testing the model #
     ######################
@@ -263,11 +263,9 @@ def finetune(args, train_loader, valid_loader, model, criterion, optimizer, devi
         model.train()
         train_mean_pts_loss = 0.0
         train_batch_cnt = 0
-        print(train_loader.keys())
         for batch_idx, batch in enumerate(train_loader):
             train_batch_cnt += 1
             img = batch['image']
-
 
             landmark = batch['landmarks']
 
@@ -400,8 +398,8 @@ def main_test():
     # For single GPU
     model = Net().to(device)
     ####################################################################
-    # criterion_pts = nn.MSELoss()
-    criterion_pts = nn.SmoothL1Loss()
+    criterion_pts = nn.MSELoss()
+    # criterion_pts = nn.SmoothL1Loss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, nesterov=True)
     # optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
     ####################################################################
@@ -423,8 +421,8 @@ def main_test():
         model_path = os.path.join(root_path, "trained_models", model_name)
         if os.path.exists(model_path):
             # how to do test?
-            model.load_state_dict(torch.load(model_path), map_location=torch.device(device))
-            valid_losses = test(args, test_loader, model, criterion_pts, optimizer, device)
+            model.load_state_dict(torch.load(model_path, map_location=torch.device(device)))
+            valid_losses = test(test_loader, model, criterion_pts, device)
             print('====================================================')
         else:
             print("model not exists.")
