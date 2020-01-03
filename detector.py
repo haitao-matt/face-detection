@@ -339,7 +339,7 @@ def finetune(args, train_loader, valid_loader, model, criterion, optimizer, devi
         print('====================================================')
         # save model
         if args.save_model and epoch_id == epoch - 1:
-            saved_model_name = os.path.join(args.save_directory, 'detector_epoch' + '_' + str(epoch) + '.pt')
+            saved_model_name = os.path.join(args.save_directory, 'detector_epoch_finetune' + '_' + str(epoch) + '.pt')
             torch.save(model.state_dict(), saved_model_name)
     return train_losses, valid_losses
 

@@ -105,6 +105,12 @@ class RandomHorizontalFlip(object):
         image_color_resize = np.asarray(
             img_color.resize((train_boarder, train_boarder), Image.BILINEAR),
             dtype=np.float32)  # Image.ANTIALIAS)
+        if len(image_color_resize.shape) == 2:
+            c = []
+            for i in range(3):
+                c.append(image_color_resize)
+            image_color_resize = np.asarray(c).astype(np.float32)
+            image_color_resize = image_color_resize.transpose([1, 2, 0])
         height, width = image_resize.shape[0], image_resize.shape[1]
         # angle_list = [-10, -30, -60, -90, 10, 30, 60, 90]
         angle_limit = 8
@@ -158,20 +164,19 @@ def load_data(phase):
             Normalize(),
             ToTensor()
         ])
-    data_set = FaceLandmarksDataset(lines, phase, transform=tsfm)
+    data_set = FaceLandmarksDataset(lines, transform=tsfm)
     return data_set
 
 
 class FaceLandmarksDataset(Dataset):
     # Face Landmarks Dataset
-    def __init__(self, src_lines, phase, transform=None):
+    def __init__(self, src_lines, transform=None):
         '''
         :param src_lines: src_lines
         :param train: whether we are training or not
         :param transform: data transform
         '''
         self.lines = src_lines
-        self.phase = phase
         self.transform = transform
 
     def __len__(self):
@@ -188,6 +193,7 @@ class FaceLandmarksDataset(Dataset):
         img_color = img_color.crop(tuple(rect))
         landmarks = np.array(landmarks).astype(np.float32)
         # get img name
+
         img_name = os.path.basename(img_name)
         # you should let your landmarks fit to the train_boarder(112)
         # please complete your code under this blank
@@ -204,9 +210,7 @@ class FaceLandmarksDataset(Dataset):
             sample['original_shape'] = img_crop.size  #img_color的大小和img_crop的大小一致
         else:
             sample['landmarks'] = landmarks_norm(sample['landmarks'])  #坐标归一化
-        # if the original img is not color, then del img_color key
-        if self.phase != 'predict':
-            del sample['img_color']
+
         return sample
 
 
@@ -254,9 +258,9 @@ def draw_picture(save_directory, img_name, landmarks, img_color):
 
 
 if __name__ == '__main__':
-    predict_set = load_data('predict')
-    for i in range(1, len(predict_set)):
-        sample = predict_set[i]
+    test_set = load_data('test')
+    for i in range(1, len(test_set)):
+        sample = test_set[i]
         original_image, original_shape, mean, std, img_color = sample['original_image'], sample['original_shape'],\
                                                          sample['mean'], sample['std'], sample['img_color']
         img_crop_width, img_crop_height = original_shape
