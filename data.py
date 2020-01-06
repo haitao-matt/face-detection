@@ -3,10 +3,8 @@ import torch
 from torchvision import transforms
 from torch.utils.data import Dataset
 from PIL import Image
-import itertools
 import matplotlib.pyplot as plt
 import os
-import time
 import random
 import cv2
 import math
@@ -14,10 +12,7 @@ import math
 
 folder_list = ['I', 'II']
 train_boarder = 112
-
-
 unloader = transforms.ToPILImage()
-
 
 def channel_norm(img):
     # img: ndarray, float32
@@ -39,11 +34,21 @@ def reverse_channel_norm(img, mean, std):
 
 def parse_line(line):
     line_parts = line.strip().split()
+    length = len(line_parts)
     img_name = line_parts[0]
-
     rect = list(map(int, list(map(float, line_parts[1:5]))))
-    landmarks = list(map(float, line_parts[5: len(line_parts)]))
-    return img_name, rect, landmarks
+    mask = int(line_parts[-1])
+    if length == 48:
+        # positive sample
+        landmarks = list(map(float, line_parts[5: len(line_parts) - 1]))
+    elif length == 6:
+        # negative sample
+        landmarks = [0.0] * 42
+    else:
+        print('abnormal data input...')
+        return
+
+    return img_name, rect, landmarks, mask
 
 
 class Normalize(object):
@@ -52,8 +57,8 @@ class Normalize(object):
         Then do channel normalization: (image - mean) / std_variation
     """
     def __call__(self, sample):
-        image, landmarks, img_name, img_color = sample['image'], sample['landmarks'], sample['img_name'], \
-                                                sample['img_color']
+        image, landmarks, img_name, img_color, mask = sample['image'], sample['landmarks'], sample['img_name'], \
+                                                sample['img_color'], sample['mask']
         image, mean, std = channel_norm(image)
 
         return {'image': image,
@@ -61,7 +66,8 @@ class Normalize(object):
                 'mean': mean,
                 'std': std,
                 'img_name': img_name,
-                'img_color': img_color
+                'img_color': img_color,
+                'mask': mask
                 }
 
 
@@ -71,8 +77,8 @@ class ToTensor(object):
         Tensors channel sequence: N x C x H x W
     """
     def __call__(self, sample):
-        image, landmarks, mean, std, img_name, img_color = sample['image'], sample['landmarks'], sample['mean'],\
-                                                           sample['std'], sample['img_name'], sample['img_color']
+        image, landmarks, mean, std, img_name, img_color, mask = sample['image'], sample['landmarks'], sample['mean'],\
+                                                           sample['std'], sample['img_name'], sample['img_color'], sample['mask']
 
         # swap color axis because
         # numpy image: H x W x C
@@ -84,7 +90,8 @@ class ToTensor(object):
                 'mean': mean,
                 'std': std,
                 'img_name': img_name,
-                'img_color': img_color
+                'img_color': img_color,
+                'mask': mask
                 }
 
 
@@ -97,8 +104,8 @@ class RandomHorizontalFlip(object):
         self.p = p
 
     def __call__(self, sample):
-        image, landmarks, img_name, img_color = sample['image'], sample['landmarks'], sample['img_name'],\
-                                                sample['img_color']
+        image, landmarks, img_name, img_color, mask = sample['image'], sample['landmarks'], sample['img_name'],\
+                                                sample['img_color'], sample['mask']
         image_resize = np.asarray(
             image.resize((train_boarder, train_boarder), Image.BILINEAR),
             dtype=np.float32)  # Image.ANTIALIAS)
@@ -139,12 +146,14 @@ class RandomHorizontalFlip(object):
             return {'image': img_rotate,
                     'landmarks': landmarks,
                     'img_name': img_name,
-                    'img_color': img_color_rotate
+                    'img_color': img_color_rotate,
+                    'mask': mask
                     }
         return {'image': image_resize,
                 'landmarks': landmarks,
                 'img_name': img_name,
-                'img_color': image_color_resize
+                'img_color': image_color_resize,
+                'mask': mask
                 }
 
 
@@ -183,7 +192,8 @@ class FaceLandmarksDataset(Dataset):
         return len(self.lines)
 
     def __getitem__(self, idx):
-        img_name, rect, landmarks = parse_line(self.lines[idx])
+        img_name, rect, landmarks, mask = parse_line(self.lines[idx])
+        # print(img_name)
         # image
         img_color = Image.open(img_name)
         # channels = len(img_color.size)
@@ -202,7 +212,7 @@ class FaceLandmarksDataset(Dataset):
         landmarks[0::2] *= train_boarder / img_crop_width
         landmarks[1::2] *= train_boarder / img_crop_height
 
-        sample = {'image': img_crop, 'landmarks': landmarks, 'img_name': img_name, 'img_color': img_color}
+        sample = {'image': img_crop, 'landmarks': landmarks, 'img_name': img_name, 'img_color': img_color, 'mask': mask}
         sample = self.transform(sample)
 
         if __name__ == "__main__":
@@ -221,7 +231,7 @@ def get_train_test_set():
     return train_set, valid_set, predict_set
 
 
-def draw_picture(save_directory, img_name, landmarks, img_color):
+def draw_picture(save_directory, img_name, landmarks, output_mask, img_color):
     img_color = img_color.squeeze(0)
     img_color = np.array(img_color).astype(np.float32)
     img_name = img_name[0]
@@ -239,30 +249,30 @@ def draw_picture(save_directory, img_name, landmarks, img_color):
     img_color = Image.fromarray(np.uint8(img_color))
 
     ## 请画出人脸crop以及对应的landmarks
-    landmarks = landmarks.squeeze(0).tolist()
-    # print(landmarks)
-
-    scatter_x = list(map(int, landmarks[0::2]))
-    scatter_y = list(map(int, landmarks[1::2]))
-
     ax = plt.gca()  # 获取到当前坐标轴信息
     ax.xaxis.set_ticks_position('top')  # 将X坐标轴移到上面
     ax.invert_yaxis()  # 反转Y坐标轴
+    if output_mask:
+        landmarks = landmarks.squeeze(0).tolist()
+        # print(landmarks)
+        scatter_x = list(map(int, landmarks[0::2]))
+        scatter_y = list(map(int, landmarks[1::2]))
+        ax.scatter(scatter_x, scatter_y, s=2, c='r', marker='.')
     plt.imshow(img_color)
     plt.title('%s\n112 * 112' % save_name)
     plt.axis('off')
-    ax.scatter(scatter_x, scatter_y, s=2, c='r', marker='.')
+
     plt.savefig("%s" % path)
     # plt.show()
     ax.cla()
 
 
 if __name__ == '__main__':
-    test_set = load_data('test')
+    test_set = load_data('train')
     for i in range(1, len(test_set)):
         sample = test_set[i]
-        original_image, original_shape, mean, std, img_color = sample['original_image'], sample['original_shape'],\
-                                                         sample['mean'], sample['std'], sample['img_color']
+        original_image, original_shape, mean, std, img_color, mask = sample['original_image'], sample['original_shape'],\
+                                                         sample['mean'], sample['std'], sample['img_color'], sample['mask']
         img_crop_width, img_crop_height = original_shape
 
         img_color = Image.fromarray(np.uint8(img_color))
@@ -282,7 +292,8 @@ if __name__ == '__main__':
         plt.imshow(img_color)
         plt.title('image\n112 * 112')
         plt.axis('off')
-        ax.scatter(scatter_x, scatter_y, s=2, c='r', marker='.')
+        if mask:
+            ax.scatter(scatter_x, scatter_y, s=2, c='r', marker='.')
         plt.subplot(122)
         plt.imshow(original_image)
         plt.title('original image\n{} * {}'.format(img_crop_width, img_crop_height))
