@@ -258,11 +258,13 @@ def generate_dataset(result, random_times):
         for each in landmarks_list:
             content += ' ' + str(each)
         content += ' 1'
-        random_num = random.randint(1, ratio_train + ratio_test)
+        random_num = random.randint(1, ratio_train + ratio_test + ratio_predict)
         if random_num <= ratio_train:
             train_fs.write(content + '\n')
-        else:
+        elif random_num <= (ratio_train + ratio_test):
             test_fs.write(content + '\n')
+        else:
+            predict_fs.write(content + '\n')
         # plt.imshow(face_img)
 
         # ax.scatter(landmarks[:, 0], landmarks[:, 1], s=1, c='r', marker='.')
@@ -274,11 +276,13 @@ def generate_dataset(result, random_times):
         rect_coordinate = str(each[0]) + ' ' + str(each[1]) + ' ' + str(each[2]) + ' ' + str(each[3])
         contents = img_path + ' ' + rect_coordinate + ' ' + '0'
         # print(contents)
-        random_num = random.randint(1, ratio_train + ratio_test)
+        random_num = random.randint(1, ratio_train + ratio_test + ratio_predict)
         if random_num <= ratio_train:
             train_fs.write(contents + '\n')
-        else:
+        elif random_num <= (ratio_train + ratio_test):
             test_fs.write(contents + '\n')
+        else:
+            predict_fs.write(contents + '\n')
 
     # plt.show()
     ax.cla()
@@ -291,8 +295,11 @@ if __name__ == "__main__":
     ratio_train = 5   # probability ratio of train dataset
     TEST_PATH = os.path.join(ROOT_PATH, 'test.txt')
     ratio_test = 1   # probability ratio of test dataset
+    PREDICT_PATH = os.path.join(ROOT_PATH, 'predict.txt')
+    ratio_predict = 1 # probability ratio of predict dataset
     train_fs = open(TRAIN_PATH, 'w')
     test_fs = open(TEST_PATH, 'w')
+    predict_fs = open(PREDICT_PATH, 'w')
     fig, ax = plt.subplots()
     print("Begin generating datasets ...")
     for each_foler in folder_list:
@@ -332,3 +339,4 @@ if __name__ == "__main__":
     print("Finish generating datasets ...")
     train_fs.close()
     test_fs.close()
+    predict_fs.close()
