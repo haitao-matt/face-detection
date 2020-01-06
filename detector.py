@@ -346,10 +346,12 @@ def predict(args, predict_loader, model, device):
             img_name = batch['img_name']
             img_color = batch['img_color']
             input_img = img.to(device)
-            output_pts = model(input_img)
+            output_pts, output_mask = model(input_img)
+            x_classes = output_mask.view(-1, 2)
+            _, preds_mask = torch.max(x_classes, 1)
             # change to 112 * 112
             output_pts *= 112
-            draw_picture(args.predict_directory, img_name, output_pts, img_color)
+            draw_picture(args.predict_directory, img_name, output_pts, preds_mask, img_color)
 
 
 def finetune(args, train_loader, valid_loader, model, criterion, criterion_cls, optimizer, device):
@@ -536,9 +538,9 @@ def main_test():
                         help='predicted pictures are saving here')
     parser.add_argument('--phase', type=str, default='Train',   # Train/train, Predict/predict, Finetune/finetune
                         help='train, test, predict or finetune')
-    parser.add_argument('--test-model', type=str, default='detector_epoch_1000.pt',
+    parser.add_argument('--test-model', type=str, default='detector_epoch_600.pt',
                         help='test model name')
-    parser.add_argument('--predict-model', type=str, default='detector_epoch_1000.pt',
+    parser.add_argument('--predict-model', type=str, default='detector_epoch_600.pt',
                         help='predict model name')
     args = parser.parse_args()
     ###################################################################################
@@ -578,7 +580,8 @@ def main_test():
     ####################################################################
     if args.phase == 'Train' or args.phase == 'train':
         print('===> Start Training')
-        train_losses, valid_losses = train(args, train_loader, valid_loader, model, criterion_pts, criterion_cls, optimizer, device)
+        train_losses, valid_losses = train(args, train_loader, valid_loader, model, criterion_pts, criterion_cls,\
+                                           optimizer, device)
         x = range(args.epochs)
         plt.plot(x, train_losses, color="r", linestyle="-", marker="o", linewidth=1, label="train")
         plt.plot(x, valid_losses, color="b", linestyle="-", marker="o", linewidth=1, label="val")
