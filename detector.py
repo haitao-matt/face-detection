@@ -105,7 +105,7 @@ class Net(nn.Module):
         return ip3, ip4
 
 
-def train(args, train_loader, valid_loader, model, criterion, criterion_cls, optimizer_rep, device):
+def train(args, train_loader, valid_loader, model, criterion, criterion_cls, optimizer, device):
     # save model
     if args.save_model:
         if not os.path.exists(args.save_directory):
@@ -118,10 +118,9 @@ def train(args, train_loader, valid_loader, model, criterion, criterion_cls, opt
     valid_losses = []
 
     for epoch_id in range(epoch):
-        if epoch_id <= 99:
-            optimizer = optimizer_rep[0]
-        else:
-            optimizer = optimizer_rep[1]
+        if epoch_id == 100:
+            optimizer.param_groups[0]["lr"] = 0.001
+
         # monitor training loss
         ######################
         # training the model #
@@ -129,6 +128,7 @@ def train(args, train_loader, valid_loader, model, criterion, criterion_cls, opt
         model.train()
         train_mean_loss = 0.0
         train_batch_cnt = 0
+        dir(optimizer)
 
         for batch_idx, batch in enumerate(train_loader, start=0):
             train_batch_cnt += 1
@@ -520,8 +520,8 @@ def main_test():
                         help='input batch size for predicting (default: 1)')
     parser.add_argument('--epochs', type=int, default=1000, metavar='N',
                         help='number of epochs to train (default: 1000)')
-    parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
-                        help='learning rate (default: 0.001)')
+    parser.add_argument('--lr', type=float, default=0.01, metavar='LR',
+                        help='learning rate (default: 0.01)')
     parser.add_argument('--momentum', type=float, default=0.4, metavar='M',
                         help='SGD momentum (default: 0.4)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -546,8 +546,6 @@ def main_test():
     ###################################################################################
     # print(args)
     torch.manual_seed(args.seed)
-    lr_stage1 = 0.01
-    lr_stage2 = 0.001
     # root_path
     root_path = os.getcwd()
     # For single GPU
@@ -573,9 +571,7 @@ def main_test():
     # classification problem criterion
     criterion_cls = nn.CrossEntropyLoss()
 
-    optimizer_stage1 = optim.SGD(model.parameters(), lr=lr_stage1, momentum=args.momentum, nesterov=True)
-    optimizer_stage2 = optim.SGD(model.parameters(), lr=lr_stage2, momentum=args.momentum, nesterov=True)
-    optimizer = (optimizer_stage1, optimizer_stage2)
+    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, nesterov=True)
     # optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
     ####################################################################
     if args.phase == 'Train' or args.phase == 'train':
@@ -612,7 +608,7 @@ def main_test():
             # how to do test?
             model.load_state_dict(torch.load(model_path, map_location=torch.device(device)))
             finetune_losses, valid_losses = \
-                finetune(args, train_loader, valid_loader, model, criterion_pts, criterion_cls, optimizer_stage2, device)
+                finetune(args, train_loader, valid_loader, model, criterion_pts, criterion_cls, optimizer, device)
             x = range(args.epochs)
             plt.plot(x, finetune_losses, color="r", linestyle="-", marker="o", linewidth=1, label="finetune")
             plt.plot(x, valid_losses, color="b", linestyle="-", marker="o", linewidth=1, label="val")
